@@ -96,7 +96,7 @@ const extractDomains = ($) => {
     if (!text || text.length > 80) return;
 
     const match = text.match(/^[a-z0-9-]+\.[a-z]{2,}$/i);
-    if (match) domains.add(match[0].toLowerCase());
+    if (match) domains.add(match[0]);
   });
 
   return [...domains];
