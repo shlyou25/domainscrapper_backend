@@ -145,26 +145,73 @@ const scrapeWithBrowser = async (url) => {
 };
 
 const extractPageNumber = (url) => {
-  const match = url.match(/page\/(\d+)/);
-  return match ? parseInt(match[1]) : 1;
+  try {
+    const parsed = new URL(url);
+
+    // ✅ query param style
+    const queryPage = parsed.searchParams.get("page");
+    if (queryPage && !isNaN(queryPage)) {
+      return parseInt(queryPage);
+    }
+
+    // ✅ path style
+    const pathMatch = parsed.pathname.match(/\/page\/(\d+)/);
+    if (pathMatch) {
+      return parseInt(pathMatch[1]);
+    }
+
+    return 1;
+  } catch {
+    return 1;
+  }
+};
+
+const buildPageUrl = (templateUrl, page) => {
+  try {
+    const parsed = new URL(templateUrl);
+
+    // ✅ query param style
+    if (parsed.searchParams.has("page")) {
+      parsed.searchParams.set("page", page);
+      return parsed.toString();
+    }
+
+    // ✅ path style
+    if (/\/page\/\d+/.test(parsed.pathname)) {
+      parsed.pathname = parsed.pathname.replace(
+        /\/page\/\d+/,
+        `/page/${page}`
+      );
+
+      return parsed.toString();
+    }
+
+    return templateUrl;
+  } catch {
+    return templateUrl;
+  }
 };
 
 const scrapePagination = async (startUrl, endUrl) => {
   const start = extractPageNumber(startUrl);
   const end = extractPageNumber(endUrl);
 
-  const base = startUrl.replace(/page\/\d+\/?$/, "page/");
+  console.log(`Start Page: ${start}`);
+  console.log(`End Page: ${end}`);
 
   let allDomains = new Set();
 
   for (let i = start; i <= end; i++) {
-    const pageUrl = `${base}${i}/`;
+    const pageUrl = buildPageUrl(startUrl, i);
+
+    console.log(`Scraping: ${pageUrl}`);
 
     try {
       let domains = await scrapeWithAxios(pageUrl);
 
+      // fallback to browser
       if (!domains || domains.length < 5) {
-        console.log(`🔄 Fallback page ${i}`);
+        console.log(`🔄 Puppeteer fallback page ${i}`);
         domains = await scrapeWithBrowser(pageUrl);
       }
 
@@ -172,7 +219,7 @@ const scrapePagination = async (startUrl, endUrl) => {
 
       await sleep(300);
     } catch (err) {
-      console.log(`Page ${i} failed`);
+      console.log(`❌ Page ${i} failed`, err.message);
     }
   }
 
